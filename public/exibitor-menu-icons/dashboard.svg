@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="17" height="17" viewBox="0 0 17 17">
+  <g id="dashboard" transform="translate(-72.5 -72.5)" opacity="0.5">
+    <rect id="Rectangle_386" data-name="Rectangle 386" width="6.601" height="6.601" rx="3.3" transform="translate(73 73)" fill="none" stroke="#23272d" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+    <rect id="Rectangle_387" data-name="Rectangle 387" width="6.601" height="6.601" rx="3.3" transform="translate(82.399 73)" fill="none" stroke="#23272d" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+    <rect id="Rectangle_388" data-name="Rectangle 388" width="6.601" height="6.601" rx="3.3" transform="translate(73 82.399)" fill="none" stroke="#23272d" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+    <rect id="Rectangle_389" data-name="Rectangle 389" width="6.601" height="6.601" rx="3.3" transform="translate(82.399 82.399)" fill="none" stroke="#23272d" stroke-linecap="round" stroke-linejoin="round" stroke-width="1"/>
+  </g>
+</svg>

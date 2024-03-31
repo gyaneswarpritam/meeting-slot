@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+  <g id="Layer_2" data-name="Layer 2" transform="translate(-2 -2)">
+    <path id="Path_1389" data-name="Path 1389" d="M10,2a8,8,0,1,0,8,8A8,8,0,0,0,10,2Zm0,14.667A6.667,6.667,0,1,1,16.667,10,6.667,6.667,0,0,1,10,16.667Z" transform="translate(0)" fill="#1c1b20"/>
+    <path id="Path_1390" data-name="Path 1390" d="M8.17,7.534A.667.667,0,0,0,7.5,8.2v4.533a.667.667,0,0,0,1.333,0V8.2A.667.667,0,0,0,8.17,7.534Zm0-2.733a.707.707,0,0,0-.68.693V5.6a.627.627,0,0,0,.68.627.693.693,0,0,0,.667-.667V5.4a.6.6,0,0,0-.667-.6Z" transform="translate(1.83 0.932)" fill="#1c1b20"/>
+  </g>
+</svg>

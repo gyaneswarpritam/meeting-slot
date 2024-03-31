@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22">
+  <g id="Group_48" data-name="Group 48" transform="translate(-312 -346)">
+    <rect id="Rectangle_34" data-name="Rectangle 34" width="22" height="22" rx="4" transform="translate(312 346)" fill="#23272d"/>
+    <path id="virtual-reality" d="M1,7.727v5A2.273,2.273,0,0,0,3.273,15H5.891a1.364,1.364,0,0,0,1.223-.755l.3-.609a.455.455,0,0,1,.809,0l.3.6A1.364,1.364,0,0,0,9.745,15h2.618a2.273,2.273,0,0,0,2.273-2.273v-5ZM12.364,5H3.273A2.273,2.273,0,0,0,1.045,6.819H14.591A2.273,2.273,0,0,0,12.364,5Z" transform="translate(315.182 347)" fill="#fff"/>
+  </g>
+</svg>
