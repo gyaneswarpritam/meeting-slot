@@ -1,27 +1,41 @@
 "use client";
-import React, { useState, useRef } from "react";
-import { userDetails } from "@/models/visitor-data";
-import "./bookmeeting.css";
-import TimezoneSelect from "react-timezone-select";
-import { tableData } from "@/models/visitor-data";
-import { AgGridReact } from "ag-grid-react";
-import "ag-grid-enterprise";
+import { tableData, userDetails } from "@/models/visitor-data";
+import Alert from "@mui/material/Alert";
+import Backdrop from "@mui/material/Backdrop";
+import CircularProgress from "@mui/material/CircularProgress";
+import Snackbar from "@mui/material/Snackbar";
 import "ag-grid-community/styles/ag-grid.css"; // Core grid CSS, always needed
 import "ag-grid-community/styles/ag-theme-alpine.css"; // Optional theme CSS
+import "ag-grid-enterprise";
+import { AgGridReact } from "ag-grid-react";
 import Image from "next/image";
-import { useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import TimezoneSelect from "react-timezone-select";
+import "./bookmeeting.css";
 
 const Page = () => {
   const user = userDetails;
   const [modelOpen, setModelOpen] = useState(false);
   const searchParams = useSearchParams();
+  const [exhibitors, setExhibitors] = useState([]);
   const titleParam = searchParams.get("title");
   const [title, setTitle] = useState(titleParam);
   const [selectedTimezone, setSelectedTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
+  const [loading, setLoading] = useState(false);
+  const [selectedExhibitorId, setSelectedExhibitorId] = useState();
+  const [error, setError] = useState({ open: false, message: "" });
+  const [selectedDate, setSelectedDate] = useState("");
   const timeslots = useRef(null);
   const tableDatas = tableData.bookings;
+  const [bookedSlots, setBookedSlots] = useState([]);
+  const pathname = usePathname();
+  const [slots, setSlots] = useState([]);
+  const visitorId = "660b6f494b846ba88dcd3f1b";
+  const visitorName = "123";
+  const [exhibitionDate, setExhibitionDate] = useState({});
   const tableColumnDef = [
     {
       headerName: "Sr.No",
@@ -73,11 +87,76 @@ const Page = () => {
       autoHeight: true,
     },
   ];
-  const handleSelect = (e) => {
-    timeslots.current.style.display = "block";
+  const validateBookingRequest = ({
+    selectedTimezone,
+    selectedExhibitorId,
+    selectedDate,
+  }) => {
+    const timeZone =
+      typeof selectedTimezone == "string"
+        ? selectedTimezone
+        : selectedTimezone?.value;
+    let message = "";
+    if (!timeZone) message = "Please Select Time Zone";
+    if (!selectedExhibitorId) message = "Please Select a Company";
+    if (!selectedDate) message = "Please Select a date";
+
+    if (message) {
+      setError({ open: true, message });
+      return false;
+    } else {
+      setError({ open: false, message: "" });
+      return true;
+    }
   };
-  const handleBooking = (e) => {
+  const handleSelect = async (e) => {
+    const id = e.target.value;
+    setSelectedExhibitorId(id);
+    if (!id) return;
+    const isValid = validateBookingRequest({
+      selectedTimezone,
+      selectedExhibitorId: id,
+      selectedDate,
+    });
+    if (isValid)
+      fetchSlots({ selectedTimezone, selectedExhibitorId: id, selectedDate });
+  };
+  const fetchSlots = async ({
+    selectedTimezone,
+    selectedExhibitorId,
+    selectedDate,
+  }) => {
+    try {
+      setLoading(true);
+      const timeZone =
+        typeof selectedTimezone == "string"
+          ? selectedTimezone
+          : selectedTimezone?.value;
+      const response = await fetch(
+        `/api/list-booking-slots?timeZone=${timeZone}&id=${selectedExhibitorId}&date=${selectedDate}`
+      );
+      const parsedResponse = await response.json();
+      if (!parsedResponse?.data?.slots?.length)
+        setError({
+          open: true,
+          message: `No Slots available for Selected Options`,
+        });
+      setSlots(parsedResponse?.data?.slots || []);
+      timeslots.current.style.display = "block";
+      setLoading(false);
+    } catch (err) {
+      console.log(err);
+      setLoading(false);
+    }
+  };
+  const handleBooking = async (e) => {
     document.getElementsByTagName("body")[0].style.overflow = "hidden";
+
+    const response = await fetch(
+      `/api/list-booked-slots?visitorId=${visitorId}`
+    );
+    const parsedResponse = await response.json();
+    setBookedSlots(parsedResponse?.bookings || []);
     setModelOpen(true);
   };
 
@@ -87,7 +166,6 @@ const Page = () => {
   };
   const getCurrentDateInput = () => {
     const dateObj = new Date();
-
     // get the month in this format of 04, the same for months
     const month = ("0" + (dateObj.getMonth() + 1)).slice(-2);
     const day = ("0" + dateObj.getDate()).slice(-2);
@@ -98,8 +176,100 @@ const Page = () => {
     return shortDate;
   };
   const handleDateChange = (e) => {
-    //event
+    setSelectedDate(e.target.value);
+    const isValid = validateBookingRequest({
+      selectedTimezone,
+      selectedExhibitorId,
+      selectedDate: e.target.value,
+    });
+    if (isValid)
+      fetchSlots({
+        selectedTimezone,
+        selectedExhibitorId,
+        selectedDate: e.target.value,
+      });
   };
+
+  useEffect(() => {
+    // setSelectedDate(getCurrentDateInput());
+  }, []);
+
+  const fetchAllExhibitors = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`/api/list-exhibitors`);
+      const parsedResponse = await response.json();
+      setExhibitors(parsedResponse?.data?.exhibitors || []);
+      setLoading(false);
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAllExhibitors();
+  }, []);
+
+  const handleSelectSlot = async (data) => {
+    if (["pending", "booked"].includes(data?.status)) return;
+    const timeZone =
+      typeof selectedTimezone == "string"
+        ? selectedTimezone
+        : selectedTimezone?.value;
+    const payload = {
+      slotDate: data?.slotDate,
+      eId: selectedExhibitorId,
+      visitorId,
+      time: data?.time,
+      duration: data?.durationInMinutes,
+      timeZone,
+    };
+    const response = await fetch(`/api/book-slot`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    const parsedResponse = await response.json();
+    //TODO handle
+    fetchSlots({
+      selectedTimezone,
+      selectedExhibitorId,
+      selectedDate,
+    });
+  };
+  const handleTimezoneChange = (timeZone) => {
+    getExhibitionDate(timeZone);
+    setSelectedTimezone(timeZone);
+    fetchSlots({
+      selectedTimezone: timeZone,
+      selectedExhibitorId,
+      selectedDate,
+    });
+  };
+
+  const getExhibitionDate = async (selectedTimezone) => {
+    try {
+      const timeZone =
+        typeof selectedTimezone == "string"
+          ? selectedTimezone
+          : selectedTimezone?.value;
+      const response = await fetch(
+        `/api/get-exhibition-date?timeZone=${timeZone}`
+      );
+      const parsedResponse = await response.json();
+      setExhibitionDate(parsedResponse?.data);
+    } catch (err) {
+      console.log(err?.message);
+    }
+  };
+  useEffect(() => {
+    getExhibitionDate(selectedTimezone);
+  }, []);
+
   return (
     <>
       <div className="mx-auto max-w-[1439px] container md:flex md:flex-row md:items-stretch md:justify-between relative">
@@ -137,7 +307,7 @@ const Page = () => {
                   <div className="ag-theme-alpine pb-1 w-full h-full ">
                     <AgGridReact
                       style={{ width: "100%", height: "100%" }}
-                      rowData={tableDatas}
+                      rowData={bookedSlots}
                       columnDefs={tableColumnDef}
                       autoSizeColumns={true}
                     ></AgGridReact>
@@ -164,25 +334,23 @@ const Page = () => {
                   Select <br /> Company
                 </p>
                 <select
+                  placeholder="Please Select the Company"
                   value={title}
                   onChange={(e) => handleSelect(e)}
                   className=" h-[35px] rounded-lg w-full pl-3 pr-5 outline-none font-medium font-lato text-sm"
                   name="company"
                   id="company"
                 >
-                  <option selected hidden value="">
+                  <option hidden value="">
                     Please Select the Company
                   </option>
-                  <option value="Texsyard international">
-                    Texsyard international
-                  </option>
-                  <option value="Vansh Creation">Vansh Creation</option>
-                  <option value="Woven World">Woven World</option>
-                  <option value="Luxe Living">Luxe Living</option>
-                  <option value="A.S.K.Hometex">A.S.K.Hometex</option>
-                  <option value="Kerala State Coir Corporation">
-                    Kerala State Coir Corporation
-                  </option>
+                  <option value="">Select</option>
+                  {exhibitors.length > 0 &&
+                    exhibitors.map((data) => {
+                      return (
+                        <option value={data?._id}>{data?.companyName}</option>
+                      );
+                    })}
                 </select>
               </div>
               <div className="  w-full md:w-fit flex flex-row justify-start items-center gap-4">
@@ -190,8 +358,10 @@ const Page = () => {
                   Select <br /> Date
                 </p>
                 <input
-                  value={getCurrentDateInput()}
-                  onChange={(e) => handleDateChange(e)}
+                  value={selectedDate}
+                  min={exhibitionDate?.startDate}
+                  max={exhibitionDate?.endDate}
+                  onInput={(e) => handleDateChange(e)}
                   className=" h-[35px] min-h-[35px] rounded-lg w-full min-w-[185px] px-3 outline-none font-medium font-lato text-sm"
                   type="date"
                   placeholder="dd/mm/yyyy"
@@ -207,7 +377,7 @@ const Page = () => {
                   <TimezoneSelect
                     className=" h-full w-full rounded-lg timezoneParent outline-none font-medium font-lato text-sm"
                     value={selectedTimezone}
-                    onChange={setSelectedTimezone}
+                    onChange={handleTimezoneChange}
                   />
                 </div>
               </div>
@@ -219,9 +389,15 @@ const Page = () => {
               >
                 <div className=" flex flex-row justify-end items-center gap-5">
                   <div className=" flex flex-row gap-1 justify-start items-center">
-                    <div className="w-2 h-2 bg-[#4ABD5D] rounded-full"></div>
+                    <div className="w-2 h-2 bg-[#ffff] rounded-full"></div>
                     <p className=" font-quickSand text-xs font-semibold">
                       Slot Available
+                    </p>
+                  </div>
+                  <div className=" flex flex-row gap-1 justify-start items-center">
+                    <div className="w-2 h-2 bg-[#4ABD5D] rounded-full"></div>
+                    <p className=" font-quickSand text-xs font-semibold">
+                      You have booked this slot
                     </p>
                   </div>
                   <div className=" flex flex-row gap-1 justify-start items-center">
@@ -236,98 +412,37 @@ const Page = () => {
                       Slot Expired
                     </p>
                   </div>
+                  <div className=" flex flex-row gap-1 justify-start items-center">
+                    <div className="w-2 h-2 bg-[orange] rounded-full"></div>
+                    <p className=" font-quickSand text-xs font-semibold">
+                      Pending Approval
+                    </p>
+                  </div>
                 </div>
                 <div className=" flex flex-row flex-wrap gap-4 justify-start items-center mt-4">
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect available rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect expired rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
-                  <div className=" timeSelect booked rounded-lg border px-3 py-2">
-                    <p className=" font-quickSand text-xs font-semibold">
-                      15:00 - 16:00
-                    </p>
-                  </div>
+                  {slots?.length > 0 &&
+                    slots?.map((data) => {
+                      return (
+                        <div
+                          className={` timeSelect 
+                          ${
+                            data?.visitorId == visitorId
+                              ? data?.status == "pending"
+                                ? "pending"
+                                : "mySlot"
+                              : data?.status == "pending"
+                              ? "booked"
+                              : data?.status
+                          } 
+                          rounded-lg border px-3 py-2`}
+                          onClick={() => handleSelectSlot(data)}
+                        >
+                          <p className=" font-quickSand text-xs font-semibold">
+                            {data?.slotTiming}
+                          </p>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
               <div className=" mt-14 flex gap-6 w-full md:w-fit flex-col md:flex-row justify-start items-start md:items-center">
@@ -344,6 +459,32 @@ const Page = () => {
             </div>
           </div>
         </section>
+        {error?.open && (
+          <Snackbar
+            anchorOrigin={{ vertical: "top", horizontal: "center" }}
+            open={error?.open}
+            autoHideDuration={6000}
+            onClose={() => setError({ open: false, message: "" })}
+          >
+            <Alert
+              onClose={() => setError({ open: false, message: "" })}
+              severity="error"
+              variant="filled"
+              sx={{ width: "100%" }}
+            >
+              {error?.message}
+            </Alert>
+          </Snackbar>
+        )}
+        {loading && (
+          <Backdrop
+            sx={{ color: "#fff", zIndex: (theme) => theme.zIndex.drawer + 1 }}
+            open={loading}
+            onClick={() => setLoading(false)}
+          >
+            <CircularProgress color="inherit" />
+          </Backdrop>
+        )}
       </div>
     </>
   );

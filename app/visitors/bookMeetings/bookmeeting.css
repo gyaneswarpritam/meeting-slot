@@ -18,9 +18,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-width: thin;
 }
 .timeSelect.available {
-  border-color: #4abd5d;
+  border-color: #fff;
   background-color: #fff;
-  color: #4abd5d;
+  color: black;
 }
 .timeSelect.expired {
   border-color: #a7a7a7;
@@ -30,6 +30,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-color: #fb5151;
   background-color: #fff;
   color: #fb5151;
+}
+.timeSelect.mySlot {
+  border-color: #4abd5d;
+  background-color: #fff;
+  color: #4abd5d;
+}
+.timeSelect.pending {
+  border-color: orange;
+  background-color: #fff;
+  color: orange;
 }
 .timezoneParent > div:first-of-type {
   min-height: 35px !important;
