@@ -7,10 +7,29 @@ import "ag-grid-community/styles/ag-theme-alpine.css"; // Optional theme CSS
 import Image from "next/image";
 
 export default function Page(props) {
-  const exbId = "660cc59e5a8047dc28fac00d";
+  const exbId = "660cc59e5a8047dc28fac00d"; //exhibitor id
   const [visitors, setVisitors] = useState([]);
-  const handleClick = (action, data) => {
+  const handleClick = async (action, data) => {
     console.log(action, data);
+    try {
+      const payload = {
+        dateId: data?.dateId,
+        slotId: data?.slotId,
+        eId: exbId,
+        status: action == "approve" ? "booked" : "rejected",
+      };
+      const response = await fetch(`/api/change-status`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      getBookedVisitors();
+    } catch (err) {
+      console.log(err);
+    }
   };
   const tableColumnDef = [
     {
@@ -65,7 +84,13 @@ export default function Page(props) {
     {
       cellRenderer: (params) => {
         return (
-          <div style={{ display: "flex", justifyContent: "space-around" }}>
+          <div
+            style={{
+              display:
+                params?.node?.data?.status === "pending" ? "flex" : "none",
+              justifyContent: "space-around",
+            }}
+          >
             <button
               style={{ color: "green" }}
               onClick={() => handleClick("approve", params.node.data)}
