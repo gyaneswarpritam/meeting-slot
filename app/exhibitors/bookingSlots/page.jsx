@@ -7,7 +7,7 @@ import "ag-grid-community/styles/ag-theme-alpine.css"; // Optional theme CSS
 import Image from "next/image";
 
 export default function Page(props) {
-  const exbId = "660cc59e5a8047dc28fac00d"; //exhibitor id
+  const exbId = "660cc59e5a8047dc28fac00d"; // TODO exhibitor id
   const [visitors, setVisitors] = useState([]);
   const handleClick = async (action, data) => {
     console.log(action, data);

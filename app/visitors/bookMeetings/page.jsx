@@ -8,6 +8,7 @@ import "ag-grid-community/styles/ag-grid.css"; // Core grid CSS, always needed
 import "ag-grid-community/styles/ag-theme-alpine.css"; // Optional theme CSS
 import "ag-grid-enterprise";
 import { AgGridReact } from "ag-grid-react";
+import moment from "moment-timezone";
 import Image from "next/image";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -25,6 +26,8 @@ const Page = () => {
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
   const [loading, setLoading] = useState(false);
+  const [isBookedSlotOnCurrentDay, setIsBookedSlotOnCurrentDay] =
+    useState(false);
   const [selectedExhibitorId, setSelectedExhibitorId] = useState();
   const [error, setError] = useState({ open: false, message: "" });
   const [selectedDate, setSelectedDate] = useState("");
@@ -33,7 +36,7 @@ const Page = () => {
   const [bookedSlots, setBookedSlots] = useState([]);
   const pathname = usePathname();
   const [slots, setSlots] = useState([]);
-  const visitorId = "660b6f494b846ba88dcd3f1b";
+  const visitorId = "660b6f494b846ba88dcd3f1b"; //TODO
   const visitorName = "123";
   const [exhibitionDate, setExhibitionDate] = useState({});
   const tableColumnDef = [
@@ -127,6 +130,7 @@ const Page = () => {
     selectedDate,
   }) => {
     try {
+      setIsBookedSlotOnCurrentDay(false);
       setLoading(true);
       const timeZone =
         typeof selectedTimezone == "string"
@@ -141,6 +145,10 @@ const Page = () => {
           open: true,
           message: `No Slots available for Selected Options`,
         });
+      const isBooked = parsedResponse?.data?.slots.find((item) => {
+        return item?.visitorId === visitorId;
+      });
+      setIsBookedSlotOnCurrentDay(isBooked);
       setSlots(parsedResponse?.data?.slots || []);
       timeslots.current.style.display = "block";
       setLoading(false);
@@ -212,34 +220,46 @@ const Page = () => {
   }, []);
 
   const handleSelectSlot = async (data) => {
-    if (["pending", "booked"].includes(data?.status)) return;
-    const timeZone =
-      typeof selectedTimezone == "string"
-        ? selectedTimezone
-        : selectedTimezone?.value;
-    const payload = {
-      slotDate: data?.slotDate,
-      eId: selectedExhibitorId,
-      visitorId,
-      time: data?.time,
-      duration: data?.durationInMinutes,
-      timeZone,
-    };
-    const response = await fetch(`/api/book-slot`, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    });
-    const parsedResponse = await response.json();
-    //TODO handle
-    fetchSlots({
-      selectedTimezone,
-      selectedExhibitorId,
-      selectedDate,
-    });
+    try {
+      if (["pending", "booked"].includes(data?.status)) return;
+      if (isBookedSlotOnCurrentDay) {
+        setError({
+          open: true,
+          message: "Multiple bookings not allowed in a day",
+        });
+        return;
+      }
+      const timeZone =
+        typeof selectedTimezone == "string"
+          ? selectedTimezone
+          : selectedTimezone?.value;
+      const payload = {
+        slotDate: data?.slotDate,
+        eId: selectedExhibitorId,
+        visitorId,
+        time: data?.time,
+        duration: data?.durationInMinutes,
+        timeZone,
+      };
+      const response = await fetch(`/api/book-slot`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+      const parsedResponse = await response.json();
+      setIsBookedSlotOnCurrentDay(true);
+      //TODO handle
+      fetchSlots({
+        selectedTimezone,
+        selectedExhibitorId,
+        selectedDate,
+      });
+    } catch (err) {
+      console.log(err);
+    }
   };
   const handleTimezoneChange = (timeZone) => {
     getExhibitionDate(timeZone);
@@ -269,6 +289,31 @@ const Page = () => {
   useEffect(() => {
     getExhibitionDate(selectedTimezone);
   }, []);
+
+  const getSlotStyle = (data) => {
+    let style = "";
+    if (data?.visitorId == visitorId) {
+      if (data?.status == "pending") {
+        style = "pending";
+      } else {
+        style = "mySlot";
+      }
+    } else if (data?.status == "pending") {
+      style = "booked";
+    } else {
+      style = data?.status;
+    }
+    // calculate today date time and convert it to utc
+    //compare it with current datetime
+    // if less style=expired
+    const cDateTime = moment
+      .tz(moment(new Date()), "UTC")
+      .format("YYYY-MM-DDTHH:mm:ssZ");
+    const isBig = moment(cDateTime).diff(moment(data?.time), "minutes");
+    if (isBig > 0) style = "expired";
+    return style;
+  };
+  useEffect(() => {}, []);
 
   return (
     <>
@@ -425,15 +470,7 @@ const Page = () => {
                       return (
                         <div
                           className={` timeSelect 
-                          ${
-                            data?.visitorId == visitorId
-                              ? data?.status == "pending"
-                                ? "pending"
-                                : "mySlot"
-                              : data?.status == "pending"
-                              ? "booked"
-                              : data?.status
-                          } 
+                          ${getSlotStyle(data)} 
                           rounded-lg border px-3 py-2`}
                           onClick={() => handleSelectSlot(data)}
                         >
