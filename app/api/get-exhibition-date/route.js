@@ -2,14 +2,14 @@ export async function GET(request, res) {
   try {
     const timeZone = request.nextUrl.searchParams.get("timeZone");
     if (!timeZone)
-      return Response.json({
+      return Response.status(500).json({
         success: false,
         message: "Timezone id cannot be empty",
       });
     const response = await fetch(
       `${process.env.SERVER_URL}/slotBooking/get-exhibitionDate?timeZone=${timeZone}`,
       {
-        next: { revalidate: 0 },
+        next: { revalidate: 1 },
       }
     );
     const parsedResponse = await response.json();
@@ -24,7 +24,7 @@ export async function GET(request, res) {
     });
   } catch (err) {
     console.error({ error: err });
-    return Response.json({
+    return Response.status(500).json({
       success: false,
       error: err?.message || "Something went wrong",
     });

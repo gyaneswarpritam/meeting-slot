@@ -18,14 +18,18 @@ export default function Page(props) {
         eId: exbId,
         status: action == "approve" ? "booked" : "rejected",
       };
-      const response = await fetch(`/api/change-status`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/change-status`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+      //TODO
       getBookedVisitors();
     } catch (err) {
       console.log(err);
@@ -112,9 +116,15 @@ export default function Page(props) {
     },
   ];
   const getBookedVisitors = async () => {
-    const response = await fetch(`/api/list-booked-visitors?id=${exbId}`);
-    const parsedResponse = await response.json();
-    if (parsedResponse?.success) setVisitors(parsedResponse?.data);
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/get-visitor-list?id=${exbId}`
+      );
+      const parsedResponse = await response.json();
+      if (parsedResponse?.success) setVisitors(parsedResponse?.data);
+    } catch (err) {
+      console.log(err);
+    }
   };
   useEffect(() => {
     getBookedVisitors();

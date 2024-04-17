@@ -137,7 +137,7 @@ const Page = () => {
           ? selectedTimezone
           : selectedTimezone?.value;
       const response = await fetch(
-        `/api/list-booking-slots?timeZone=${timeZone}&id=${selectedExhibitorId}&date=${selectedDate}`
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/list-slots?timeZone=${timeZone}&id=${selectedExhibitorId}&date=${selectedDate}`
       );
       const parsedResponse = await response.json();
       if (!parsedResponse?.data?.slots?.length)
@@ -149,10 +149,14 @@ const Page = () => {
         return item?.visitorId === visitorId;
       });
       setIsBookedSlotOnCurrentDay(isBooked);
-      setSlots(parsedResponse?.data?.slots || []);
+      setSlots([...parsedResponse?.data?.slots] || []);
       timeslots.current.style.display = "block";
       setLoading(false);
     } catch (err) {
+      setError({
+        open: true,
+        message: err?.message || "Something went wrong please try again",
+      });
       console.log(err);
       setLoading(false);
     }
@@ -161,7 +165,7 @@ const Page = () => {
     document.getElementsByTagName("body")[0].style.overflow = "hidden";
 
     const response = await fetch(
-      `/api/list-booked-slots?visitorId=${visitorId}`
+      `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/list-booked-slots?visitorId=${visitorId}`
     );
     const parsedResponse = await response.json();
     setBookedSlots(parsedResponse?.bookings || []);
@@ -205,7 +209,9 @@ const Page = () => {
   const fetchAllExhibitors = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`/api/list-exhibitors`);
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/list-exhibitors`
+      );
       const parsedResponse = await response.json();
       setExhibitors(parsedResponse?.data?.exhibitors || []);
       setLoading(false);
@@ -221,14 +227,24 @@ const Page = () => {
 
   const handleSelectSlot = async (data) => {
     try {
-      if (["pending", "booked"].includes(data?.status)) return;
-      if (isBookedSlotOnCurrentDay) {
+      if (data?.status === "booked") return;
+      if (isBookedSlotOnCurrentDay && data?.status === "available") {
         setError({
           open: true,
           message: "Multiple bookings not allowed in a day",
         });
         return;
       }
+      const currentDateTime = moment
+        .tz(moment(new Date()), "UTC")
+        .format("YYYY-MM-DDTHH:mm:ssZ");
+      const isExpired = moment(currentDateTime).diff(
+        moment(data?.time),
+        "minutes"
+      );
+      if (isExpired > 0) return;
+      let status = "";
+      if (data?.status !== "pending") status = "pending";
       const timeZone =
         typeof selectedTimezone == "string"
           ? selectedTimezone
@@ -240,15 +256,20 @@ const Page = () => {
         time: data?.time,
         duration: data?.durationInMinutes,
         timeZone,
+        status,
+        slotId: data?.slotId,
       };
-      const response = await fetch(`/api/book-slot`, {
-        method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/book-slot`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
       const parsedResponse = await response.json();
       setIsBookedSlotOnCurrentDay(true);
       //TODO handle
@@ -278,7 +299,7 @@ const Page = () => {
           ? selectedTimezone
           : selectedTimezone?.value;
       const response = await fetch(
-        `/api/get-exhibition-date?timeZone=${timeZone}`
+        `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/get-exhibitionDate?timeZone=${timeZone}`
       );
       const parsedResponse = await response.json();
       setExhibitionDate(parsedResponse?.data);
@@ -303,14 +324,15 @@ const Page = () => {
     } else {
       style = data?.status;
     }
-    // calculate today date time and convert it to utc
-    //compare it with current datetime
-    // if less style=expired
-    const cDateTime = moment
+
+    const currentDateTime = moment
       .tz(moment(new Date()), "UTC")
       .format("YYYY-MM-DDTHH:mm:ssZ");
-    const isBig = moment(cDateTime).diff(moment(data?.time), "minutes");
-    if (isBig > 0) style = "expired";
+    const isExpired = moment(currentDateTime).diff(
+      moment(data?.time),
+      "minutes"
+    );
+    if (isExpired > 0) style = "expired";
     return style;
   };
   useEffect(() => {}, []);
@@ -469,6 +491,7 @@ const Page = () => {
                     slots?.map((data) => {
                       return (
                         <div
+                          key={data?.slotTiming}
                           className={` timeSelect 
                           ${getSlotStyle(data)} 
                           rounded-lg border px-3 py-2`}

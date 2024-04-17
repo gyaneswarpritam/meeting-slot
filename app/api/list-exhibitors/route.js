@@ -3,19 +3,19 @@ export async function GET(req, res) {
     const response = await fetch(
       `${process.env.SERVER_URL}/slotBooking/list-exhibitors`,
       {
-        next: { revalidate: 0 },
+        next: { revalidate: 1 },
       }
     );
     const parsedResponse = await response.json();
     if (!parsedResponse?.success)
-      return Response.json({
+      return Response.status(500).json({
         success: false,
         error: err?.message || "Something wen wrong",
       });
     return Response.json({ success: true, data: parsedResponse?.data });
   } catch (err) {
     console.error({ error: err });
-    return Response.json({
+    return Response.status(500).json({
       success: false,
       error: err?.message || "Something wen wrong",
     });

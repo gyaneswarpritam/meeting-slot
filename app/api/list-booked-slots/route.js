@@ -2,14 +2,14 @@ export async function GET(request, res) {
   try {
     const visitorId = request.nextUrl.searchParams.get("visitorId");
     if (!visitorId)
-      return Response.json({
+      return Response.status(500).json({
         success: false,
         message: "Visitor id cannot be empty",
       });
     const response = await fetch(
       `${process.env.SERVER_URL}/slotBooking/list-booked-slots?visitorId=${visitorId}`,
       {
-        next: { revalidate: 0 },
+        next: { revalidate: 1 },
       }
     );
     const parsedResponse = await response.json();
@@ -24,7 +24,7 @@ export async function GET(request, res) {
     });
   } catch (err) {
     console.error({ error: err });
-    return Response.json({
+    return Response.status(500).json({
       success: false,
       error: err?.message || "Something went wrong",
     });

@@ -16,14 +16,14 @@ export async function POST(req, res) {
     );
     const parsedResponse = await response.json();
     if (!parsedResponse?.success)
-      return Response.json({
+      return Response.status(500).json({
         success: false,
         error: parsedResponse?.message || "Something went wrong",
       });
     return Response.json({ success: true, message: parsedResponse?.message });
   } catch (err) {
     console.log(err);
-    return Response.json({
+    return Response.status(500).json({
       success: false,
       error: err?.message || "Something went wrong",
     });
