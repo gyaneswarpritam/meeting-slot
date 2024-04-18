@@ -25,9 +25,9 @@ const Page = () => {
   const [selectedTimezone, setSelectedTimezone] = useState(
     Intl.DateTimeFormat().resolvedOptions().timeZone
   );
+  const [selectedSlot, setSelectedSlot] = useState({});
   const [loading, setLoading] = useState(false);
-  const [isBookedSlotOnCurrentDay, setIsBookedSlotOnCurrentDay] =
-    useState(false);
+  const [isBookedSlotOnCurrentDay, setIsBookedSlotOnCurrentDay] = useState({});
   const [selectedExhibitorId, setSelectedExhibitorId] = useState();
   const [error, setError] = useState({ open: false, message: "" });
   const [selectedDate, setSelectedDate] = useState("");
@@ -113,6 +113,7 @@ const Page = () => {
     }
   };
   const handleSelect = async (e) => {
+    setSelectedSlot({});
     const id = e.target.value;
     setSelectedExhibitorId(id);
     if (!id) return;
@@ -140,6 +141,10 @@ const Page = () => {
         `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/list-slots?timeZone=${timeZone}&id=${selectedExhibitorId}&date=${selectedDate}`
       );
       const parsedResponse = await response.json();
+      if (!parsedResponse?.success)
+        throw new Error(
+          parsedResponse?.message || "Something went wrong.Please try again"
+        );
       if (!parsedResponse?.data?.slots?.length)
         setError({
           open: true,
@@ -149,6 +154,17 @@ const Page = () => {
         return item?.visitorId === visitorId;
       });
       setIsBookedSlotOnCurrentDay(isBooked);
+
+      setSelectedSlot({
+        slotDate: isBooked?.slotDate,
+        eId: selectedExhibitorId,
+        visitorId,
+        time: isBooked?.time,
+        duration: isBooked?.durationInMinutes,
+        timeZone,
+        status: isBooked?.status,
+        slotId: isBooked?.slotId,
+      });
       setSlots([...parsedResponse?.data?.slots] || []);
       timeslots.current.style.display = "block";
       setLoading(false);
@@ -188,6 +204,7 @@ const Page = () => {
     return shortDate;
   };
   const handleDateChange = (e) => {
+    setSelectedSlot({});
     setSelectedDate(e.target.value);
     const isValid = validateBookingRequest({
       selectedTimezone,
@@ -227,14 +244,9 @@ const Page = () => {
 
   const handleSelectSlot = async (data) => {
     try {
-      if (data?.status === "booked") return;
-      if (isBookedSlotOnCurrentDay && data?.status === "available") {
-        setError({
-          open: true,
-          message: "Multiple bookings not allowed in a day",
-        });
-        return;
-      }
+      let isBooked = slots.find((item) => {
+        return item?.visitorId === visitorId;
+      });
       const currentDateTime = moment
         .tz(moment(new Date()), "UTC")
         .format("YYYY-MM-DDTHH:mm:ssZ");
@@ -242,7 +254,30 @@ const Page = () => {
         moment(data?.time),
         "minutes"
       );
-      if (isExpired > 0) return;
+      if (data?.status === "booked" || isExpired > 0) return;
+      if (isBooked?.status == "booked") {
+        setError({
+          open: true,
+          message: "Multiple bookings are not allowed in a day",
+        });
+        return;
+      }
+      if (isBooked && data?.status === "available") {
+        if (!Object.keys(selectedSlot).length) return;
+        const payload = { ...selectedSlot, status: "" };
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/book-slot`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          }
+        );
+        const parsedResponse = await response.json();
+      }
       let status = "";
       if (data?.status !== "pending") status = "pending";
       const timeZone =
@@ -259,6 +294,21 @@ const Page = () => {
         status,
         slotId: data?.slotId,
       };
+
+      if (isBooked) {
+        isBooked = {
+          slotDate: isBooked?.slotDate,
+          eId: selectedExhibitorId,
+          visitorId,
+          time: isBooked?.time,
+          duration: isBooked?.durationInMinutes,
+          timeZone,
+          status,
+          slotId: isBooked?.slotId,
+        };
+      }
+
+      if (status == "pending") setSelectedSlot(payload);
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_SERVER_URL}/slotBooking/book-slot`,
         {
@@ -271,7 +321,7 @@ const Page = () => {
         }
       );
       const parsedResponse = await response.json();
-      setIsBookedSlotOnCurrentDay(true);
+      setIsBookedSlotOnCurrentDay(payload);
       //TODO handle
       fetchSlots({
         selectedTimezone,
@@ -283,6 +333,7 @@ const Page = () => {
     }
   };
   const handleTimezoneChange = (timeZone) => {
+    setSelectedSlot({});
     getExhibitionDate(timeZone);
     setSelectedTimezone(timeZone);
     fetchSlots({
